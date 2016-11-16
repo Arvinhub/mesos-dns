@@ -89,6 +89,9 @@ type Config struct {
 	httpConfigMap httpcli.ConfigMap
 
 	MesosAuthentication httpcli.AuthMechanism
+
+	// Rather than truncate the answer, only return a sample of answers
+	DefaultSampleAnswers int
 }
 
 // NewConfig return the default config of the resolver
@@ -119,6 +122,7 @@ func NewConfig() Config {
 		IPSources:           []string{"netinfo", "mesos", "host"},
 		EnumerationOn:       true,
 		MesosAuthentication: httpcli.AuthNone,
+		DefaultSampleAnswers:0,
 	}
 }
 
@@ -251,6 +255,7 @@ func (c Config) log() {
 	logging.Verbose.Println("   - MesosHTTPSOn", c.MesosHTTPSOn)
 	logging.Verbose.Println("   - CACertFile", c.CACertFile)
 	logging.Verbose.Println("   - MesosAuthentication: ", c.MesosAuthentication)
+	logging.Verbose.Println("   - DefaultSampleAnswers: ", c.DefaultSampleAnswers)
 	switch c.MesosAuthentication {
 	case httpcli.AuthBasic:
 		logging.Verbose.Println("   - MesosCredentials: ", c.MesosCredentials.Principal+":******")

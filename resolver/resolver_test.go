@@ -418,14 +418,14 @@ func TestMultiError(t *testing.T) {
 }
 
 func TestTruncate(t *testing.T) {
-	tm := *newTruncated()
+	tm := *newTruncated(0)
 	if !tm.Truncated {
 		t.Fatal("Message not truncated")
 	}
 	if l := tm.Len(); l > 512 {
 		t.Fatalf("Message too large: %d bytes", l)
 	}
-	tm2 := *truncate(&tm, true)
+	tm2 := *truncate(&tm, true, 0)
 	if !tm2.Truncated {
 		t.Fatal("Original truncation status was not preseved")
 	}
@@ -440,19 +440,38 @@ func TestTruncate(t *testing.T) {
 
 }
 
+func TestTruncateTo(t *testing.T) {
+	tm := *newTruncated(5)
+
+	if tm.Truncated {
+		t.Fatal("Message truncated, not sampled")
+	}
+
+	if tm.Len() > dns.MinMsgSize {
+		t.Fatal("Message too large")
+	}
+
+
+	if len(tm.Answer) > 5 || len(tm.Answer) == 0 {
+		t.Fatal("Invalid answer count")
+	}
+
+	newTruncated(500)
+}
+
 func BenchmarkTruncate(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		newTruncated()
+		newTruncated(0)
 	}
 }
 
-func newTruncated() *dns.Msg {
+func newTruncated(sampleAnswers int) *dns.Msg {
 	m := Message(
 		Question("example.com.", dns.TypeA),
 		Header(false, dns.RcodeSuccess),
 		Answers(genA(50)...))
 
-	return truncate(m, true)
+	return truncate(m, true, sampleAnswers)
 }
 
 func genA(n int) []dns.RR {

@@ -285,7 +285,7 @@ func (res *Resolver) HandleNonMesos(fwd exchanger.Forwarder) func(
 		} else if len(m.Answer) == 0 {
 			logging.CurLog.NonMesosNXDomain.Inc()
 		}
-		reply(w, m)
+		res.reply(w, m)
 	}
 }
 
@@ -343,7 +343,7 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 		logging.CurLog.MesosFailed.Inc()
 	}
 
-	reply(w, m)
+	res.reply(w, m)
 }
 
 func (res *Resolver) handleSRV(rs *records.RecordGenerator, name string, m, r *dns.Msg) error {
@@ -441,10 +441,10 @@ func (res *Resolver) handleEmpty(rs *records.RecordGenerator, name string, m, r 
 
 // reply writes the given dns.Msg out to the given dns.ResponseWriter,
 // compressing the message first and truncating it accordingly.
-func reply(w dns.ResponseWriter, m *dns.Msg) {
+func (res *Resolver) reply(w dns.ResponseWriter, m *dns.Msg) {
 	m.Compress = true // https://github.com/mesosphere/mesos-dns/issues/{170,173,174}
 
-	if err := w.WriteMsg(truncate(m, isUDP(w))); err != nil {
+	if err := w.WriteMsg(truncate(m, isUDP(w), res.config.DefaultSampleAnswers)); err != nil {
 		logging.Error.Println(err)
 	}
 }
@@ -457,7 +457,7 @@ func isUDP(w dns.ResponseWriter) bool {
 // truncate removes answers until the given dns.Msg fits the permitted
 // length of the given transmission channel and sets the TC bit.
 // See https://tools.ietf.org/html/rfc1035#section-4.2.1
-func truncate(m *dns.Msg, udp bool) *dns.Msg {
+func truncate(m *dns.Msg, udp bool, defaultSampleAnswers int) *dns.Msg {
 	max := dns.MinMsgSize
 	if !udp {
 		max = dns.MaxMsgSize
@@ -466,30 +466,60 @@ func truncate(m *dns.Msg, udp bool) *dns.Msg {
 	}
 
 	furtherTruncation := m.Len() > max
-	m.Truncated = m.Truncated || furtherTruncation
 
 	if !furtherTruncation {
 		return m
 	}
 
 	m.Extra = nil // Drop all extra records first
-	if m.Len() < max {
-		return m
-	}
+
+	m = truncateTo(m, m.Answer[:], max, defaultSampleAnswers)
+
 	answers := m.Answer[:]
+	if (defaultSampleAnswers == 0) {
+		m = biSampleTo(m, answers, max)
+		m.Truncated = m.Truncated || furtherTruncation
+	} else {
+		m =  truncateTo(m, answers, max, defaultSampleAnswers)
+	}
+	return m
+}
+
+/* (Sargun): Archaeology -
+ * From all I can tell this is an attempt to find an efficient way to do sampling in o(log(n). It seems a bit too
+ * complicated for its own good. We should think about removing it. I think it makes sense to start at some small
+ * number and subsample.
+ */
+func biSampleTo(m *dns.Msg, originalAnswers []dns.RR, max int) *dns.Msg {
 	left, right := 0, len(m.Answer)
 	for {
 		if left == right {
 			break
 		}
 		mid := (left + right) / 2
-		m.Answer = answers[:mid]
+		m.Answer = originalAnswers[:mid]
 		if m.Len() < max {
 			left = mid + 1
 			continue
 		}
 		right = mid
 	}
+	return m
+}
+
+func truncateTo(m *dns.Msg, originalAnswers []dns.RR, maxSize int, sampleAnswers int) *dns.Msg {
+	/* We check if sampleAnswers has hit 0, because the questions might be making the reply bigger than
+	 * we can put into the DNS packet.
+	 */
+
+	for sampleAnswers > 0 && len(originalAnswers) > sampleAnswers {
+		m.Answer = originalAnswers[:sampleAnswers]
+		if m.Len() < maxSize {
+			break
+		}
+		sampleAnswers--
+	}
+
 	return m
 }
 
