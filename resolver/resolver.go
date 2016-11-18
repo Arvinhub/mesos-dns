@@ -476,11 +476,11 @@ func truncate(m *dns.Msg, udp bool, defaultSampleAnswers int) *dns.Msg {
 	m = truncateTo(m, m.Answer[:], max, defaultSampleAnswers)
 
 	answers := m.Answer[:]
-	if (defaultSampleAnswers == 0) {
+	if defaultSampleAnswers == 0 {
 		m = biSampleTo(m, answers, max)
 		m.Truncated = m.Truncated || furtherTruncation
 	} else {
-		m =  truncateTo(m, answers, max, defaultSampleAnswers)
+		m = truncateTo(m, answers, max, defaultSampleAnswers)
 	}
 	return m
 }

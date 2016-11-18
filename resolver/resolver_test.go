@@ -451,7 +451,6 @@ func TestTruncateTo(t *testing.T) {
 		t.Fatal("Message too large")
 	}
 
-
 	if len(tm.Answer) > 5 || len(tm.Answer) == 0 {
 		t.Fatal("Invalid answer count")
 	}
