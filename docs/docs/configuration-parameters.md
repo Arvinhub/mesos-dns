@@ -109,6 +109,8 @@ The configured name will always be converted to a FQDN by ensuring it ends with 
 `IPSources` defines a fallback list of IP sources for task records,
 sorted by priority. If you use **Docker**, and enable the `netinfo` IPSource, it may cause tasks to become unreachable, because after Mesos 0.25, the Docker executor publishes the container's internal IP in NetworkInfo. The default value is: `["netinfo", "mesos", "host"]`
 
+`DefaultSampleAnswers` staes whether to return a sample of answers, as opposed to a truncated answer. This will not set the truncation bit on the response, in order to prevent clients from falling back to TCP
+
 - `host`: Host IP of the Mesos slave where a task is running.
 - `mesos`: Mesos containerizer IP. **DEPRECATED**
 - `docker`: Docker containerizer IP. **DEPRECATED**
